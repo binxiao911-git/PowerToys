@@ -1,0 +1,14 @@
+name: Test Action
+
+on:
+  workflow_dispatch:
+
+jobs:
+  hello:
+    runs-on: windows-latest
+
+    steps:
+      - name: Hello
+        run: |
+          echo "Hello PowerToys!"
+          dir
