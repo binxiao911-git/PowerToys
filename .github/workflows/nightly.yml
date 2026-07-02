@@ -1,0 +1,119 @@
+name: PowerToys Nightly Build & Release
+run-name: Nightly Build ${{ github.sha }}
+on:
+  # 手动触发
+  workflow_dispatch:
+  # 每日凌晨2点自动构建
+  schedule:
+    - cron: '0 2 * * *'
+  # 同步上游后推送main分支自动触发
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+env:
+  PLATFORM: x64
+  CONFIG: Release
+  RETAIN_RELEASE_COUNT: 15
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  build-installer:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout full source & submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # 配置MSBuild环境
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      # 安装WiX Toolset 5（构建安装包必需）
+      - name: Install WiX v5
+        shell: pwsh
+        run: |
+          choco install wixtoolset --version=5.0.1 -y
+          echo "C:\Program Files\WiX Toolset v5\bin" | Out-File -Append $env:GITHUB_PATH
+
+      # 安装.NET 8 SDK
+      - name: Setup .NET SDK 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # 执行官方完整构建脚本（含安装包）
+      - name: Run official build-installer.ps1
+        shell: pwsh
+        run: |
+          .\tools\build\build-installer.ps1 -Platform $env:PLATFORM -Configuration $env:CONFIG -CIBuild $true
+        env:
+          CI: true
+
+      # 收集构建产物（exe+msi）
+      - name: Collect setup artifacts
+        shell: pwsh
+        run: |
+          mkdir -Force .\artifacts
+          Copy-Item .\installer\PowerToysSetupVNext\x64\Release\MachineSetup\*.exe .\artifacts\ -Recurse
+          Copy-Item .\installer\PowerToysSetupVNext\x64\Release\MachineSetup\*.msi .\artifacts\ -Recurse
+          Get-ChildItem .\artifacts
+
+      # 上传产物到Action缓存
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: powertoys-nightly-packages
+          path: ./artifacts/
+          retention-days: 30
+
+  publish-nightly-release:
+    needs: build-installer
+    runs-on: windows-2022
+    steps:
+      - name: Download built installer packages
+        uses: actions/download-artifact@v4
+        with:
+          name: powertoys-nightly-packages
+          path: ./artifacts
+
+      - name: Install GitHub CLI
+        shell: pwsh
+        run: choco install gh -y
+
+      - name: Generate nightly tag & title
+        id: taggen
+        shell: pwsh
+        run: |
+          $dateTag = "nightly-$(Get-Date -Format 'yyyy.MM.dd')"
+          echo "TAG=$dateTag" >> $env:GITHUB_ENV
+          echo "TITLE=PowerToys Nightly Build $(Get-Date -Format 'yyyy-MM-dd')" >> $env:GITHUB_ENV
+
+      - name: Cleanup old nightly releases (keep ${{ env.RETAIN_RELEASE_COUNT }})
+        shell: pwsh
+        run: |
+          $releases = gh release list --limit 100 --json tagName,id | ConvertFrom-Json
+          $nightlyReleases = $releases | Where-Object { $_.tagName -match '^nightly-\d{4}\.\d{2}\.\d{2}$' }
+          $toDelete = $nightlyReleases | Select-Object -Skip $env:RETAIN_RELEASE_COUNT
+          foreach ($r in $toDelete) {
+            Write-Host "Delete old release: $($r.tagName) ID:$($r.id)"
+            gh release delete $r.tagName -y
+          }
+
+      - name: Create new nightly release & upload installers
+        shell: pwsh
+        run: |
+          gh release create $env:TAG `
+            --title "$env:TITLE" `
+            --prerelease `
+            --notes "Auto-built nightly from main branch commit: ${{ github.sha }}
+Build Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+Platform: x64 Release
+Auto-synced upstream microsoft/PowerToys main source" `
+            ./artifacts/*.exe ./artifacts/*.msi
