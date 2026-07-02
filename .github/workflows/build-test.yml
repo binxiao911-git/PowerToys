@@ -1,0 +1,25 @@
+name: Build Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Show VS
+        run: msbuild -version
+
+      - name: Show .NET
+        run: dotnet --info
+
+      - name: List build scripts
+        shell: powershell
+        run: |
+          Get-ChildItem tools\build
