@@ -7,8 +7,8 @@ on:
   schedule:
     - cron: '0 2 * * *'
   # 同步上游后推送main分支自动触发
-  push:
-    branches: [ main ]
+  #push:
+  #  branches: [ main ]
 
 permissions:
   contents: write
