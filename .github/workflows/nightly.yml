@@ -36,13 +36,10 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       # 安装WiX Toolset 5（构建安装包必需）
-      - name: Install WiX v5 Direct
-        shell: pwsh
-        run: |
-          $setupFile = "wix501.exe"
-          Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix/releases/download/v5.0.1/wix501.exe" -OutFile $setupFile -TimeoutSec 300
-          .\$setupFile /install /quiet /norestart
-          echo "C:\Program Files\WiX Toolset v5\bin" | Out-File -Append $env:GITHUB_PATH
+      - name: Install WiX Toolset v5
+        uses: wixtoolset/actions/setup-wix@v1
+        with:
+          wix-version: 5.0.1
 
       # 安装.NET 8 SDK
       - name: Setup .NET SDK 8
