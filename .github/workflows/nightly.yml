@@ -91,11 +91,5 @@ jobs:
       - name: Create new nightly release & upload exe
         shell: pwsh
         run: |
-          $releaseNotes = @"
-Auto-built nightly from main branch commit: ${{ github.sha }}
-Build Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-Platform: x64 Release
-Note: This build skips MSI installer packaging due to WiX network installation issues, only raw exe provided.
-Auto-synced upstream microsoft/PowerToys main source
-"@
-          gh release create $env:TAG --title "$env:TITLE" --prerelease --notes "$releaseNotes" ./artifacts/*.exe
+          $noteText = "Auto-built nightly commit ${{ github.sha }} | Build Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | x64 Release, Skip MSI installer due to WiX network issue"
+          gh release create $env:TAG --title "$env:TITLE" --prerelease --notes "$noteText" ./artifacts/*.exe
