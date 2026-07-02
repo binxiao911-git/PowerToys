@@ -115,5 +115,6 @@ jobs:
             --notes "Auto-built nightly from main branch commit: ${{ github.sha }}
 Build Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 Platform: x64 Release
-Auto-synced upstream microsoft/PowerToys main source" `
-            ./artifacts/*.exe ./artifacts/*.msi
+Auto-synced upstream microsoft/PowerToys main source
+"@
+    gh release create $env:TAG --title "$env:TITLE" --prerelease --notes "$releaseNotes" ./artifacts/*.exe ./artifacts/*.msi
