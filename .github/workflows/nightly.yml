@@ -36,15 +36,12 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       # 安装WiX Toolset 5（构建安装包必需）
-      - name: Install WiX v5
+      - name: Install WiX v5 Direct
         shell: pwsh
         run: |
-          # 切换清华Chocolatey镜像，解决国外源超时问题
-          choco source remove -n=chocolatey -y
-          choco source add -n=chocolatey -s=https://mirrors.tuna.tsinghua.edu.cn/chocolatey/ --u=anonymous --p=anonymous
-          # 固定版本安装WiX
-          choco install wixtoolset --version=5.0.1 -y --no-progress
-          # 将WiX路径写入系统PATH
+          $setupFile = "wix501.exe"
+          Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix/releases/download/v5.0.1/wix501.exe" -OutFile $setupFile -TimeoutSec 300
+          .\$setupFile /install /quiet /norestart
           echo "C:\Program Files\WiX Toolset v5\bin" | Out-File -Append $env:GITHUB_PATH
 
       # 安装.NET 8 SDK
