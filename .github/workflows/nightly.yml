@@ -1,14 +1,9 @@
 name: PowerToys Nightly Build & Release
 run-name: Nightly Build ${{ github.sha }}
 on:
-  # 手动触发
   workflow_dispatch:
-  # 每日凌晨2点自动构建
   schedule:
     - cron: '0 2 * * *'
-  # 同步上游后推送main分支自动触发
-  #push:
-  #  branches: [ main ]
 
 permissions:
   contents: write
@@ -31,40 +26,28 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      # 配置MSBuild环境
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      # 安装WiX Toolset 5（构建安装包必需）
-      - name: Install WiX Toolset v5
-        uses: wixtoolset/actions/setup-wix@v1
-        with:
-          wix-version: 5.0.1
-
-      # 安装.NET 8 SDK
       - name: Setup .NET SDK 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
 
-      # 执行官方完整构建脚本（含安装包）
-      - name: Run official build-installer.ps1
+      - name: Run official build script (Only main program, skip installer package)
         shell: pwsh
         run: |
-          .\tools\build\build-installer.ps1 -Platform $env:PLATFORM -Configuration $env:CONFIG -CIBuild $true
+          .\tools\build\build.ps1 -Platform $env:PLATFORM -Configuration $env:CONFIG -CIBuild $true
         env:
           CI: true
 
-      # 收集构建产物（exe+msi）
-      - name: Collect setup artifacts
+      - name: Collect compiled exe artifacts
         shell: pwsh
         run: |
           mkdir -Force .\artifacts
-          Copy-Item .\installer\PowerToysSetupVNext\x64\Release\MachineSetup\*.exe .\artifacts\ -Recurse
-          Copy-Item .\installer\PowerToysSetupVNext\x64\Release\MachineSetup\*.msi .\artifacts\ -Recurse
+          Copy-Item .\x64\Release\*.exe .\artifacts\ -Recurse
           Get-ChildItem .\artifacts
 
-      # 上传产物到Action缓存
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -76,7 +59,7 @@ jobs:
     needs: build-installer
     runs-on: windows-2022
     steps:
-      - name: Download built installer packages
+      - name: Download built exe packages
         uses: actions/download-artifact@v4
         with:
           name: powertoys-nightly-packages
@@ -105,8 +88,14 @@ jobs:
             gh release delete $r.tagName -y
           }
 
-      - name: Create new nightly release & upload installers
+      - name: Create new nightly release & upload exe
         shell: pwsh
         run: |
-          $noteText = "Auto-built nightly from main commit ${{ github.sha }} | Build Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | Platform x64 Release | Synced microsoft/PowerToys main"
-          gh release create $env:TAG --title "$env:TITLE" --prerelease --notes "$noteText" ./artifacts/*.exe ./artifacts/*.msi
+          $releaseNotes = @"
+Auto-built nightly from main branch commit: ${{ github.sha }}
+Build Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+Platform: x64 Release
+Note: This build skips MSI installer packaging due to WiX network installation issues, only raw exe provided.
+Auto-synced upstream microsoft/PowerToys main source
+"@
+          gh release create $env:TAG --title "$env:TITLE" --prerelease --notes "$releaseNotes" ./artifacts/*.exe
