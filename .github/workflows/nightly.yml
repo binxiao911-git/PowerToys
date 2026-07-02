@@ -109,10 +109,8 @@ jobs:
       - name: Create new nightly release & upload installers
         shell: pwsh
         run: |
-          gh release create $env:TAG `
-            --title "$env:TITLE" `
-            --prerelease `
-            --notes "Auto-built nightly from main branch commit: ${{ github.sha }}
+          $releaseNotes = @"
+Auto-built nightly from main branch commit: ${{ github.sha }}
 Build Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 Platform: x64 Release
 Auto-synced upstream microsoft/PowerToys main source
